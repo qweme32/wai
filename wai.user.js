@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         WAI.js
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  try to take over the world!
+// @version      1.1
+// @description  Smart one-line translate
 // @author       Qweme
 // @include      https://*
 // @include      http://*
@@ -48,6 +48,11 @@ class WaiCore {
 
         document.addEventListener("keydown", ev => {
             if (ev.code == "KeyT" && this.state.selected) {
+                if (ev.defaultPrevented ||
+                    /(input|textarea)/i.test(document.activeElement.nodeName)) {
+                    return;
+                }
+
                 console.log("[WAI.js] Start translation...")
                 GM.xmlHttpRequest({
                     method: "GET",
