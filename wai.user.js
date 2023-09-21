@@ -1,13 +1,31 @@
 // ==UserScript==
 // @name         WAI.js
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Smart one-line translate
 // @author       Qweme
 // @include      https://*
 // @include      http://*
 // @grant        GM.xmlHttpRequest
+// @grant        GM.registerMenuCommand
+// @grant        GM.setValue
+// @grant        GM_getValue
 // ==/UserScript==
+
+GM.registerMenuCommand ("Use MyMemory (5000 chars/day)", selectMyMemory);
+GM.registerMenuCommand ("Use Google Translate ( Unlimited, but bad translation )", selectGoogle);
+
+function selectMyMemory() {
+    GM.setValue("wai-engine", "mm");
+    console.log("[WAI.js] Engine setted to MyMemory");
+    alert("[WAI.js] Engine setted to MyMemory");
+}
+
+function selectGoogle() {
+    GM.setValue("wai-engine", "gt");
+    console.log("[WAI.js] Engine setted to Google Translate");
+    alert("[WAI.js] Engine setted to Google Translate");
+}
 
 class WaiCore {
     constructor() { }
@@ -21,8 +39,14 @@ class WaiCore {
         console.log("[WAI.js] Init.");
     }
 
-    // onTextSelected()
-    // https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=fr&q=Привет
+    replaceSelected(text) {
+        const range = window.getSelection().getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createTextNode(text));
+
+        console.log("[WAI.js] Text replaced.")
+    }
+
     selectionHook() {
         document.addEventListener('mouseup', () => {
             const selectedText = window.getSelection().toString();
@@ -31,14 +55,6 @@ class WaiCore {
                 this.state.text = selectedText;
                 this.state.selected = true;
             }
-            //   // пользователь выделил текст
-            //   console.log("Пользователь выделил текст:", selectedText);
-
-            //   // заменить выделенный текст на "123"
-            //   const range = window.getSelection().getRangeAt(0);
-            //   range.deleteContents();
-            //   range.insertNode(document.createTextNode("123"));
-            // }
         });
 
         document.addEventListener("mousedown", () => {
@@ -53,22 +69,38 @@ class WaiCore {
                     return;
                 }
 
-                console.log("[WAI.js] Start translation...")
-                GM.xmlHttpRequest({
-                    method: "GET",
-                    url: "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=ru&q=" + this.state.text,
-                    headers: {
-                        "Content-Type": "application/json",
-                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"
-                    },
-                    onload: function (res) {
-                        const range = window.getSelection().getRangeAt(0);
-                        range.deleteContents();
-                        range.insertNode(document.createTextNode(JSON.parse(res.response)[0][0][0]));
+                let engine = GM_getValue("wai-engine", "gt");
 
-                        console.log("[WAI.js] Text replaced.")
-                    }
-                });
+                console.log(`[WAI.js] Start translation via ${engine}`);
+
+                if (engine == "gt") {
+                    GM.xmlHttpRequest({
+                        method: "GET",
+                        url: "https://translate.googleapis.com/translate_a/single?client=gtx&dt=t&sl=auto&tl=ru&q=" + this.state.text,
+                        headers: {
+                            "Content-Type": "application/json",
+                            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"
+                        },
+                        onload: (res) => {
+                            this.replaceSelected(JSON.parse(res.response)[0][0][0]);
+                        }
+                    });
+                } else if (engine == "mm") {
+                    GM.xmlHttpRequest({
+                        method: "GET",
+                        url: "http://api.mymemory.translated.net/get?langpair=EN|RU&q=" + this.state.text,
+                        headers: {
+                            "Content-Type": "application/json",
+                            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X x.y; rv:42.0) Gecko/20100101 Firefox/42.0"
+                        },
+                        onload: (res) => {
+                            this.replaceSelected(JSON.parse(res.response)["responseData"]["translatedText"]);
+                        }
+                    });
+                } else {
+                    console.log("[WAI.js] Engine not found.")
+                }
+
             }
         })
 
